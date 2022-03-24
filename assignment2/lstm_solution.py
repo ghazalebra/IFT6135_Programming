@@ -116,12 +116,12 @@ class LSTM(nn.Module):
         # batch
         for n in range(shape[0]):
             # position
-            for t in range(1, shape[1]):
+            for t in range(shape[1]):
                 if mask[n, t]:
                     loss[n, t] = log_probas[n, t, targets[n, t]]
                     number += 1
 
-        loss = - torch.sum(loss) / number
+        loss = - float(torch.sum(loss) / number)
         # ==========================
         return loss
 
