@@ -54,6 +54,7 @@ def train(epoch, model, dataloader, optimizer, args):
         
 
         loss = model.loss(log_probas, batch["target"], batch["mask"])
+
         losses.append(loss.item() * batch["mask"].sum().item())
 
         loss.backward()

@@ -76,8 +76,9 @@ class LSTM(nn.Module):
         # TODO: Write your code here
         embeddings = self.embedding(inputs)
         out_features, (hidden_states_n, cell_states_n) = self.lstm(embeddings, hidden_states)
-        # must be checked
-        log_probas = self.classifier(out_features)
+
+        logits = self.classifier(out_features)
+        log_probas = F.log_softmax(logits, 2)
         # ==========================
         return log_probas, (hidden_states_n, cell_states_n)
 
@@ -109,19 +110,9 @@ class LSTM(nn.Module):
 
         # ==========================
         # TODO: Write your code here
-        loss = torch.zeros_like(targets)
-        shape = log_probas.size()
-        number = 0
+        loss = F.nll_loss(torch.transpose(log_probas, 1, 2), targets, reduction='none')
 
-        # batch
-        for n in range(shape[0]):
-            # position
-            for t in range(shape[1]):
-                if mask[n, t]:
-                    loss[n, t] = log_probas[n, t, targets[n, t]]
-                    number += 1
-
-        loss = - float(torch.sum(loss) / number)
+        loss = torch.sum(loss*mask) / torch.sum(mask)
         # ==========================
         return loss
 
