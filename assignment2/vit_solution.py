@@ -37,9 +37,10 @@ class LayerNorm(nn.Module):
 
         # ==========================
         # TODO: Write your code here
-        mean = torch.mean(inputs, dim=0)
-        var = torch.var(inputs, dim=0, unbiased=False)
-        normalized_inputs = inputs - mean / torch.sqrt(var + self.eps)
+        mean = torch.mean(inputs, dim=-1, keepdim=True)
+        # var = torch.mean(torch.pow(inputs - mean, 2), dim=0)
+        var = torch.var(inputs, dim=-1, unbiased=False, keepdim=True)
+        normalized_inputs = (inputs - mean) / torch.sqrt(var + self.eps)
         outputs = normalized_inputs * self.weight + self.bias
         # ==========================
         return outputs
@@ -58,15 +59,11 @@ class MultiHeadedAttention(nn.Module):
 
         # ==========================
         # TODO: Write your code here
-        self.W_Q = nn.Parameter(torch.Tensor(num_heads * head_size, num_heads * head_size))
-        self.W_K = nn.Parameter(torch.Tensor(num_heads * head_size, num_heads * head_size))
-        self.W_V = nn.Parameter(torch.Tensor(num_heads * head_size, num_heads * head_size))
-        self.W_O = nn.Parameter(torch.Tensor(num_heads * head_size, num_heads * head_size))
-
-        self.b_Q = nn.Parameter(torch.Tensor(num_heads * head_size))
-        self.b_V = nn.Parameter(torch.Tensor(num_heads * head_size))
-        self.b_K = nn.Parameter(torch.Tensor(num_heads * head_size))
-        self.b_O = nn.Parameter(torch.Tensor(num_heads * head_size))
+        dim = num_heads * head_size
+        self.linear1 = nn.Linear(dim, dim)
+        self.linear2 = nn.Linear(dim, dim)
+        self.linear3 = nn.Linear(dim, dim)
+        self.linear4 = nn.Linear(dim, dim)
         # ==========================
 
     def get_attention_weights(self, queries, keys):
@@ -102,7 +99,7 @@ class MultiHeadedAttention(nn.Module):
         # ==========================
         # TODO: Write your code here
 
-        weights = torch.softmax((queries * keys.transpose(2, 3)) / torch.sqrt(self.head_size))
+        weights = torch.softmax((queries @ (keys.transpose(2, 3))) / np.sqrt(self.head_size), dim=-1)
 
         # ==========================
         return weights
@@ -148,7 +145,7 @@ class MultiHeadedAttention(nn.Module):
         # ==========================
         # TODO: Write your code here
         Ai = self.get_attention_weights(queries, keys)
-        hi = Ai * values
+        hi = Ai @ values
         A = self.merge_heads(hi)
         # ==========================
         return A
@@ -180,7 +177,7 @@ class MultiHeadedAttention(nn.Module):
         # ==========================
         # TODO: Write your code here
         batch_size = tensor.size()[0]
-        output = tensor.view(batch_size, self.sequence_length, self.num_heads, self.head_size).transpose(1, 2)
+        output = tensor.view(batch_size, self.sequence_length, self.num_heads, tensor.shape[2]//self.num_heads).transpose(1, 2)
         # ==========================
         return output
 
@@ -210,7 +207,7 @@ class MultiHeadedAttention(nn.Module):
         # ==========================
         # TODO: Write your code here
         batch_size = tensor.size()[0]
-        output = tensor.transpose(1, 2).reshape(batch_size, self.sequence_length, self.num_heads * self.head_size)
+        output = tensor.transpose(1, 2).reshape(batch_size, self.sequence_length, -1)
         # ==========================
         return output
 
@@ -248,14 +245,16 @@ class MultiHeadedAttention(nn.Module):
 
         # ==========================
         # TODO: Write your code here
-
-        queries = self.split_heads(hidden_states * self.W_O + self.b_O)
-        keys = self.split_heads(hidden_states * self.W_K + self.b_K)
-        values = self.split_heads(hidden_states * self.W_V + self.b_V)
+        queries = self.linear1(hidden_states)
+        queries = self.split_heads(queries)
+        keys = self.linear2(hidden_states)
+        keys = self.split_heads(keys)
+        values = self.linear3(hidden_states)
+        values = self.split_heads(values)
 
         attention = self.apply_attention(queries, keys, values)
 
-        output = attention * self.W_O + self.b_O
+        output = self.linear4(attention)
         # ==========================
         return output
 
@@ -439,8 +438,7 @@ class VisionTransformer(nn.Module):
 
         # ==========================
         # TODO: Write your code here
-        cls_tokens = self.cls_token(x)
-        output = self.mlp_head(cls_tokens)
+        output = self.mlp_head(x[:, 0, :])
         # ==========================
 
         return output

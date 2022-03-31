@@ -112,7 +112,7 @@ class LSTM(nn.Module):
         # TODO: Write your code here
         loss = F.nll_loss(torch.transpose(log_probas, 1, 2), targets, reduction='none')
 
-        loss = torch.sum(loss*mask) / torch.sum(mask)
+        loss = torch.mean(torch.sum(loss*mask, dim=1) / torch.sum(mask, dim=1))
         # ==========================
         return loss
 
